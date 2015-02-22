@@ -1,5 +1,9 @@
 module Mongoid
   module Multitenancy
+    module Errors
+      class TenantNotSetError < StandardError; end
+    end
+
     module Document
       extend ActiveSupport::Concern
 
@@ -27,7 +31,8 @@ module Mongoid
         #
         # @return [ Field ] The generated field
         def tenant(association = :account, options = {})
-          options = { full_indexes: true, immutable: true }.merge!(options)
+          options = { full_indexes: true, immutable: true, force_tenant: false }.merge!(options)
+          force_tenant = options[:force_tenant]
           assoc_options, multitenant_options = build_options(options)
 
           # Setup the association between the class and the tenant class
@@ -149,6 +154,8 @@ module Mongoid
               else
                 where(tenant_field => tenant_id)
               end
+            elsif force_tenant and not Multitenancy.allow_no_tenant
+              raise Multitenancy::Errors::TenantNotSetError, "No tenant set for #{self}"
             else
               where(nil)
             end
