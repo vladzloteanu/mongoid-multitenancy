@@ -1,5 +1,9 @@
 module Mongoid
   module Multitenancy
+    module Errors
+      class TenantNotSetError < StandardError; end
+    end
+
     module Document
       extend ActiveSupport::Concern
 
@@ -7,9 +11,10 @@ module Mongoid
         attr_accessor :tenant_field, :full_indexes
 
         def tenant(association = :account, options = {})
-          options = { full_indexes: true }.merge(options)
+          options = { full_indexes: true, force_tenant: false}.merge(options)
           active_model_options = options.clone
           to_index = active_model_options.delete(:index)
+          force_tenant = active_model_options.delete(:force_tenant)
           tenant_options = { optional: active_model_options.delete(:optional), immutable: active_model_options.delete(:immutable) { true } }
           self.full_indexes = active_model_options.delete(:full_indexes)
 
@@ -33,13 +38,15 @@ module Mongoid
 
           # Set the default_scope to scope to current tenant
           default_scope lambda {
-            criteria = if Multitenancy.current_tenant
+            if Multitenancy.current_tenant
               if tenant_options[:optional]
                 #any_of({ self.tenant_field => Multitenancy.current_tenant.id }, { self.tenant_field => nil })
                 where({ tenant_field.to_sym.in => [Multitenancy.current_tenant.id, nil] })
               else
                 where({ tenant_field => Multitenancy.current_tenant.id })
               end
+            elsif force_tenant and not Multitenancy.allow_no_tenant
+              raise Multitenancy::Errors::TenantNotSetError, "No tenant set for #{self}"
             else
               where(nil)
             end

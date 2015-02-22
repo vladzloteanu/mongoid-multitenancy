@@ -22,19 +22,35 @@ module Mongoid
         Thread.current[:current_tenant]
       end
 
+      # Won't throw error if no tenant is set
+      def allow_no_tenant
+        Thread.current[:allow_no_tenant]
+      end
+
+      def allow_no_tenant=(ant)
+        Thread.current[:allow_no_tenant] = ant
+      end
+
       # Affects a tenant temporary for a block execution
-      def with_tenant(tenant, &block)
+      def with_tenant(tenant, allow_no_tenant=false, &block)
         if block.nil?
           raise ArgumentError, "block required"
         end
 
         old_tenant = self.current_tenant
+        old_allow_no_tenant = self.allow_no_tenant
+
         self.current_tenant = tenant
+        self.allow_no_tenant = allow_no_tenant
 
-        block.call
-
-        self.current_tenant = old_tenant
+        begin
+          block.call
+        ensure
+          self.current_tenant = old_tenant
+          self.allow_no_tenant = old_allow_no_tenant
+        end
       end
+
     end
   end
 end
