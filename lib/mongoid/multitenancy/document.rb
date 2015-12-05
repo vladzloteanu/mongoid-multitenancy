@@ -11,7 +11,7 @@ module Mongoid
         attr_accessor :tenant_field, :tenant_options
 
         # List of authorized options
-        MULTITENANCY_OPTIONS = [:optional, :immutable, :full_indexes, :index]
+        MULTITENANCY_OPTIONS = [:optional, :immutable, :full_indexes, :index, :force_tenant]
 
         # Defines the tenant field for the document.
         #
@@ -32,7 +32,6 @@ module Mongoid
         # @return [ Field ] The generated field
         def tenant(association = :account, options = {})
           options = { full_indexes: true, immutable: true, force_tenant: false }.merge!(options)
-          force_tenant = options[:force_tenant]
           assoc_options, multitenant_options = build_options(options)
 
           # Setup the association between the class and the tenant class
@@ -154,7 +153,7 @@ module Mongoid
               else
                 where(tenant_field => tenant_id)
               end
-            elsif force_tenant and not Multitenancy.allow_no_tenant
+            elsif tenant_options[:force_tenant] and not Multitenancy.allow_no_tenant
               raise Multitenancy::Errors::TenantNotSetError, "No tenant set for #{self}"
             else
               where(nil)
